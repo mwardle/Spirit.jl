@@ -57,3 +57,12 @@ end
     @test headers["accept"] == "application/json; q=0.6, application/yaml; q=0.8"
 end
 
+@testset "delete" begin
+    headers = Headers("Content-Type" => "application/json")
+    
+    modified = delete(headers, "content-type")
+    
+    @test haskey(headers, "content-type") == true
+    @test haskey(modified, "content-type") == false
+end
+
