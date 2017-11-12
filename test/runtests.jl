@@ -2,4 +2,6 @@ using Spirit
 using Base.Test
 
 # write your own tests here
-@test 1 == 2
+@testset "Headers" begin
+    include("test_headers.jl")
+end
