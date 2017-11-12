@@ -1,120 +1,99 @@
-export pipeline
-export join
-export resume
-export Pipeline
+export pipe, resume, recover, Pipeline
 
-immutable Pipeline
-    pipe::Function
+struct Pipeline
+    exec::Function
 end # Pipeline
 
 function resolve_continuation(continuation)
     isa(continuation, Future) ? fetch(continuation) : continuation
 end # resolveContinuation
 
-const pipeline_reducer = function(fn, nextpipe)
-    function (continuation)
-        if isdone(continuation)
-            continuation
-        else
-            continuation = resolve_continuation(fn(continuation.req, continuation.res))
-            if isdone(continuation)
+const pipeline_reducer = function(prevpipe, nextpipe)
+    if (isa(prevpipe, Function))
+        function(continuation)
+            if isfin(continuation)
                 continuation
             else
+                continuation = resolve_continuation(prevpipe(continuation...))
                 nextpipe(continuation)
             end
+        end
+    else
+        function(continuation)
+            nextpipe(prevpipe(continuation))
         end
     end
 end
 
-
 """
-    join(Pipeline, Pipeline|Function)
-    
-Concatenate two pipelines into one
+    pipe(stages::Union{Function,Pipeline)...)::Pipeline
+        
+Create an http handler pipe.
 
 ```julia
-p = pipeline([
-    (req, res) -> next(req, setheader(res, "X-Powered-By", "Spirit"))
+p = pipe([
+    (req::Request, res::Response) -> cont(req, setheader(res, "X-Powered-By", "Spirit")),
+    (req::Request, res::Response) -> fin(req, respond_text(res, "A text response...")) 
 ])
 
-p = join(p, pipeline([
-    (req, res) -> done(req, respond_text(res, "Powered by Spirit!"))
-]))
+run(p, req, res)
 ```
 """
-function join(first::Pipeline, second::Pipeline)::Pipeline
-    pipe = function(continuation)
-        continuation = second(first(continuation))
-    end
+function pipe(stages::Union{Function,Pipeline}...)::Pipeline
+    exec = foldr(pipeline_reducer, c -> c, stages)
+    Pipeline(exec)
+end # pipe
 
-    Pipeline(pipe)
-end # join
+function Base.run(p::Pipeline, data...)::Continuation
+    p(cont(data...))
+end # run
 
-function join(first::Pipeline, second::Function)::Pipeline
-    join(first, pipeline([second]))
-end # join
-
+function (pipe::Pipeline)(continuation::Continuation)::Continuation
+    resolve_continuation(pipe.exec(continuation))
+end # Pipeline()
 
 """
     resume(Pipeline, Pipeline|Function)
     
-Continue a pipeline that is done.
+Continue a pipe that is fin.
 
 ```julia
-p = pipeline([
-    (req, res) -> done(req, respond_text("this is wrong"))
+p = pipe([
+    (req, res) -> fin(req, respond_text("this is wrong"))
 ])
 
-p = resume(p, pipeline([
-    (req, res) -> done(req, respond_text("this is right"))
+p = resume(p, pipe([
+    (req, res) -> fin(req, respond_text("this is right"))
 ]))
 ```
 """
-function resume(first::Pipeline, second::Pipeline)::Pipeline
-    pipe = function(continuation)
+function resume(first::Pipeline, stages::Union{Pipeline,Function}...; always::Bool=false)::Pipeline
+    second = pipe(stages...)
+    exec = function(continuation)
         continuation = first(continuation)
-        if isnext(continuation)
+        if iscont(continuation) && !always
             continuation
         else
-            second(next(continuation.req, continuation.res))
+            second(cont(continuation...))
         end
     end
 
-    Pipeline(pipe)
+    Pipeline(exec)
 end # resume
 
-function resume(first::Pipeline, second::Function)::Pipeline
-    resume(first, pipeline([second]))
-end # resume
-
-
 """
-    pipeline(stages::Vector{Function})::Pipeline
-        
-Create an http handler pipeline.
-
-```julia
-pipeline([
-    (req::Request, res::Response) -> next(req, setheader(res, "X-Powered-By", "Spirit")),
-    (req::Request, res::Response) -> done(req, respond_text(res, "A text response...")) 
-])
-```
+    recover(Pipeline, Function)
+    
+Recover from exceptions thrown within a pipeline
 """
-function pipeline(stages::Vector{Function})::Pipeline
-    pipe = foldr(pipeline_reducer, c -> c, stages)
-    Pipeline(pipe)
-end # pipeline
-
-function pipeline(stages)::Pipeline
-    # should throw if invalid
-    pipeline(Vector{Function}(stages))
-end # pipeline
-
-   
-function (pipeline::Pipeline)(req::Request, res::Response)::Continuation
-    pipeline(next(req, res))
-end # Pipeline()
-
-function (pipeline::Pipeline)(continuation::Continuation)::Continuation
-    resolve_continuation(pipeline.pipe(continuation))
-end
+function recover(first::Pipeline, recovery::Function)::Pipeline
+    exec = function(continuation)
+        try
+            first(continuation)
+        catch e
+            recovery(e, continuation...)
+        end
+    end
+    
+    Pipeline(exec)
+end # recover

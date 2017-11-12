@@ -1,19 +1,39 @@
-export done
-export next
+export fin, cont, isfin, iscont, Continuation, Finish, Continue
 
-@enum ContinuationState Done Next
+@enum ContinuationState Finish Continue
 
-immutable Continuation
+struct Continuation{T <: Tuple}
     state::ContinuationState
-    req::Request
-    res::Response
+    data::T
 end # Continuation
 
-isdone(continuation::Continuation) = continuation.state == Done
-isnext(continuation::Continuation) = continuation.state == Next
+isfin(continuation::Continuation) = continuation.state == Finish
+iscont(continuation::Continuation) = continuation.state == Continue
 
-done(req::Request, res::Response) = Continuation(Done, req, res)
-done(res::Response, req::Request) = done(req, res)
+fin(args...) = Continuation(Finish, tuple(args...))
+cont(args...) = Continuation(Continue, tuple(args...))
 
-next(req::Request, res::Response) = Continuation(Next, req, res)
-next(res::Response, req::Request) = next(req, res)
+function Base.show(io::IO, cont::Continuation)
+    
+    if cont.state == Finish
+        print(io, "fin(")
+    else
+        print(io, "cont(")
+    end
+    
+    comma = false
+    for v in cont
+        if comma
+            print(io, ", ")
+        end
+        comma = true
+        
+        show(io, v)
+    end
+    
+    print(io, ")")
+end
+    
+Base.start(c::Continuation) = Base.start(c.data)
+Base.done(c::Continuation, state) = Base.done(c.data, state)
+Base.next(c::Continuation, state) = Base.next(c.data, state)
