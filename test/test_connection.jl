@@ -1,5 +1,7 @@
+httptest1 = include("./data/http/test1.jl")
+
 @testset "readrequestline" begin
-    const io = open("./test/data/http/test1.http")
+    const io = IOBuffer(httptest1)
     const c = Connection(io)
     
     Spirit.readrequestline!(c)
@@ -11,7 +13,7 @@
 end
 
 @testset "readheaders" begin
-    const io = open("./test/data/http/test1.http")
+    const io = IOBuffer(httptest1)
     const c = Connection(io)
 
     Spirit.readrequestline!(c)
