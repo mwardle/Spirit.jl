@@ -13,3 +13,7 @@ end
 @testset "Pipeline" begin
     include("test_pipeline.jl")
 end
+
+@testset "Connection" begin
+    include("test_connection.jl")
+end
