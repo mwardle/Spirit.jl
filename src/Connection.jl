@@ -7,6 +7,7 @@ const DEFAULT_MAX_VERSION = Int64(10)
 
 const OCTETS = Set(UInt8(0):UInt8(255))
 const CHAR = Set(UInt8(0):UInt8(127))
+const VCHAR = Set(UInt8(0x21):UInt8(0x7E))  # visible characters
 const UCALPHA = Set(UInt8('A'):UInt8('Z'))
 const LCALPHA = Set(UInt8('a'):UInt8('z'))
 const ALPHA = union(UCALPHA, LCALPHA)
@@ -27,7 +28,8 @@ const LWS = Set([SP,HT])
 const TEXT = union(setdiff(OCTETS, CTL), LWS)
 const HEX = union(DIGIT, Set(Vector{UInt8}("abcdefABCDEF")))
 const SEPARATOR = Set(Vector{UInt8}("()<>@,;:\\\"/[]?={} \t"))
-const TOKEN = setdiff(setdiff(CHAR, SEPARATOR), CTL)
+# const TOKEN = setdiff(setdiff(CHAR, SEPARATOR), CTL)
+const TOKEN = union(Set(Vector{UInt8}("!#$%&'*+-.^_`|~")), ALPHA, DIGIT)
 
 const URI_GENDELIMS = Set(Vector{UInt8}(":/?#[]@"))
 const URI_SUBDELIMS = Set(Vector{UInt8}("!\$&'()*+,;="))
@@ -83,7 +85,7 @@ function Connection(socket::IO)
         Nullable{Headers}())
 end
 
-function readrequestline!(connection::Connection; maxuri=DEFAULT_MAX_URI, maxmethod=DEFAULT_MAX_METHOD, maxversion=DEFAULT_MAX_VERSION, keepcomments=false)
+function readrequestline!(connection::Connection; maxuri=DEFAULT_MAX_URI, maxmethod=DEFAULT_MAX_METHOD, maxversion=DEFAULT_MAX_VERSION)
     if !isnull(connection.method)
         throw(HttpError(500; message="Cannot read http connection request line when it has already been read", shouldclose=true))
     end
@@ -92,10 +94,11 @@ function readrequestline!(connection::Connection; maxuri=DEFAULT_MAX_URI, maxmet
     uri = Vector{UInt8}()
     version = Vector{UInt8}()
     socket = connection.socket
+    foundend = false
     
     # parse the method
     ind = 1
-    while isopen(socket)
+    while isopen(socket) && !eof(socket)
         b = read(socket, UInt8)
         if b == SP
             # method is done
@@ -167,6 +170,8 @@ function readrequestline!(connection::Connection; maxuri=DEFAULT_MAX_URI, maxmet
                 throw(HttpError(505, message="HTTP Version not supported", shouldclose=true))
             end
             
+            foundend = true
+            
             break
         elseif b == LF
             throw(HttpError(400; message="Invalid request line (line terminator)", shouldclose=true))
@@ -181,7 +186,10 @@ function readrequestline!(connection::Connection; maxuri=DEFAULT_MAX_URI, maxmet
         end
         ind += 1
     end
-        
+    
+    if !foundend
+        throw(HttpError(400; message="Unexpected end of file", shouldclose=true))
+    end
     connection.method = Nullable(String(method))
     connection.uri = Nullable(String(uri))
     connection.httpversion = Nullable(String(version))
@@ -189,7 +197,7 @@ function readrequestline!(connection::Connection; maxuri=DEFAULT_MAX_URI, maxmet
     return connection
 end
 
-function readheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER)
+function readheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER, keepcomments=true)
     if !isnull(connection.rawheaders)
         throw(HttpError(500, message="Cannot read http connection headers when they have already been read", shouldclose=true))
     end
@@ -201,6 +209,7 @@ function readheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER)
     headers = Vector{Pair{String,String}}()
     headername = Vector{UInt8}()
     headervalue = Vector{UInt8}()
+    foundend = false
     foundcolon = false
     instring = false
     commentlevel = 0
@@ -232,6 +241,7 @@ function readheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER)
             elseif !foundcolon
                 if length(headername) == 0
                     # last header found
+                    foundend = true
                     break
                 else
                     throw(HttpError(400; message="Invalid header line (missing name separator)", shouldclose=true))
@@ -343,7 +353,7 @@ function readheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER)
                 # TODO: This is not valid in the middle of a text header field
                 push!(headervalue, b)
                 instring = true
-            elseif b == RIGHTPAREN && in(lowercase(String(headername)), COMMENTABLE_HEADER_FIELDS)
+            elseif b == LEFTPAREN && in(lowercase(String(headername)), COMMENTABLE_HEADER_FIELDS)
                 if keepcomments
                     push!(headervalue, b)
                 end
@@ -367,6 +377,9 @@ function readheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER)
         ind += 1
     end
     
+    if !foundend
+        throw(HttpError(400; message="Unexpected end of file", shouldclose=true))
+    end
     connection.rawheaders = Nullable(headers)
     connection.headers = Headers(headers...)
     
