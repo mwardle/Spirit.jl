@@ -6,11 +6,12 @@ mutable struct ChunkedTransferDecodeStream <: IO
     nread::UInt64
     chunkstart::UInt64
     chunksize::UInt64   # of the current chunk
-    ondone::Nullable{Function}
+    ondone::Function
+    onstart::Function
 end
 
-function ChunkedTransferDecodeStream(source::IO; maxsize=typemax(UInt64), ondone=Nullable{Function}())
-    ChunkedTransferDecodeStream(source, maxsize, 0, 0, 0, ondone)
+function ChunkedTransferDecodeStream(source::IO; maxsize=typemax(UInt64), ondone::Function=NOOP, onstart::Function=NOOP)
+    ChunkedTransferDecodeStream(source, maxsize, 0, 0, 0, ondone, onstart)
 end
 
 function Base.read(s::ChunkedTransferDecodeStream, ::Type{UInt8})
@@ -18,7 +19,6 @@ function Base.read(s::ChunkedTransferDecodeStream, ::Type{UInt8})
     if eof(s)
         throw(EOFError())
     end
-    
     b = read(s.source, UInt8)
     s.nread += 1
     if s.nread >= s.maxsize
@@ -36,6 +36,9 @@ end
 # end
 
 function Base.eof(s::ChunkedTransferDecodeStream)
+    if s.nread == 0
+        s.onstart()
+    end
     if eof(s.source)
         true
     else
@@ -135,8 +138,8 @@ function readchunksize(s::ChunkedTransferDecodeStream)
     s.chunkstart = s.nread
     
     # notify parser so trailers can be consumed
-    if s.chunksize == 0 && !isnull(s.ondone)
-        get(s.ondone)()
+    if s.chunksize == 0
+        s.ondone()
     end
 
     s.chunksize

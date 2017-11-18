@@ -4,22 +4,25 @@ mutable struct SizedStream <: IO
     source::IO
     size::UInt64
     nread::UInt64
-    ondone::Nullable{Function}
+    ondone::Function
+    onstart::Function
 end
 
-function SizedStream(source, size; ondone=Nullable{Function}())
-    SizedStream(source, size, 0, ondone)
+function SizedStream(source, size; ondone::Function=NOOP, onstart::Function=NOOP)
+    SizedStream(source, size, 0, ondone, onstart)
 end
 
 function Base.read(s::SizedStream, ::Type{UInt8})
     if eof(s)
         throw(EOFError())
     end
-    
+    if s.nread == 0
+        s.onstart()
+    end
     s.nread += 1
     b = read(s.source, UInt8)
-    if s.nread == s.size && !isnull(s.ondone)
-        get(s.ondone)()
+    if s.nread == s.size
+        s.ondone()
     end
     b
 end

@@ -1,6 +1,8 @@
 export Connection, readrequestline!, readheaders!, readbody!
 
 const DEFAULT_MAX_HEADER = Int64(80 * 1024)
+const DEFAULT_MAX_TRAILER = Int64(20 * 1024)
+
 const DEFAULT_MAX_URI = Int64(8000)
 const DEFAULT_MAX_METHOD = Int64(16)
 const DEFAULT_MAX_VERSION = Int64(10)
@@ -23,7 +25,8 @@ const BACKSLASH = UInt8('\\')   # used for escapes in strings and comments
 const LEFTPAREN = UInt8('(')           # used for beginning of comments in some headers
 const RIGHTPAREN = UInt8(')')           # used for end of comments in some headers
 const COLON = UInt8(':')
-
+const COMMA = UInt8(',')
+const EQUAL = UInt8('=')
 const LWS = Set([SP,HT])
 const TEXT = union(setdiff(OCTETS, CTL), LWS)
 const HEX = union(DIGIT, Set(Vector{UInt8}("abcdefABCDEF")))
@@ -69,8 +72,10 @@ mutable struct Connection
     rawheaders::Nullable{Vector{Pair{String,String}}}
     headers::Nullable{Headers}
     bodystream::Nullable{IO}
-    rawtrailers::Nullable{Vector{String}}
+    rawtrailers::Nullable{Vector{Pair{String,String}}}
     trailers::Nullable{Headers}
+    bodystartedread::Bool
+    bodyfullyread::Bool
 end
 
 function Connection(socket::IO)
@@ -82,10 +87,12 @@ function Connection(socket::IO)
         Nullable{Headers}(),
         Nullable{IO}(),
         Nullable{Vector{String}}(),
-        Nullable{Headers}())
+        Nullable{Headers}(),
+        false,
+        false)
 end
 
-function readrequestline!(connection::Connection; maxuri=DEFAULT_MAX_URI, maxmethod=DEFAULT_MAX_METHOD, maxversion=DEFAULT_MAX_VERSION)
+function readrequestline!(connection::Connection; maxuri=DEFAULT_MAX_URI, maxmethod=DEFAULT_MAX_METHOD, maxversion=DEFAULT_MAX_VERSION, strict=false)
     if !isnull(connection.method)
         throw(HttpError(500; message="Cannot read http connection request line when it has already been read", shouldclose=true))
     end
@@ -100,9 +107,19 @@ function readrequestline!(connection::Connection; maxuri=DEFAULT_MAX_URI, maxmet
     ind = 1
     while isopen(socket) && !eof(socket)
         b = read(socket, UInt8)
+        if b == CR && ind == 1 && !strict
+            # https://tools.ietf.org/html/rfc7230#section-3.5 (robustness)
+            # this is technically wrong, but expected bad behavior
+            ind += 1
+            b = read(socket, UInt8)
+            if b != LF
+                throw(HttpError(400; message="Invalid character in http method", shouldclose=true))
+            end
+            ind += 1
+        end
         if b == SP
             # method is done
-            if ind == 1
+            if length(method) == 0
                 throw(HttpError(400; message="Missing http method", shouldclose=true))
             end
             break
@@ -165,16 +182,21 @@ function readrequestline!(connection::Connection; maxuri=DEFAULT_MAX_URI, maxmet
                 throw(HttpError(400; message="Invalid request line (line terminator)", shouldclose=true))
             end
             
-            if version != V1_0 && version != V1_1
-                # TODO: support HTTP/2.0
-                throw(HttpError(505, message="HTTP Version not supported", shouldclose=true))
-            end
-            
             foundend = true
             
             break
         elseif b == LF
-            throw(HttpError(400; message="Invalid request line (line terminator)", shouldclose=true))
+            if strict
+                throw(HttpError(400; message="Invalid request line (line terminator)", shouldclose=true))
+            end
+            
+            if !founddot
+                throw(HttpError(400; message="Invalid http version text", shouldclose=true))
+            end
+            
+            foundend = true
+            break
+            
         elseif !in(b, DIGIT)
             throw(HttpError(400; message="Invalid http version text", shouldclose=true))
         else
@@ -193,19 +215,14 @@ function readrequestline!(connection::Connection; maxuri=DEFAULT_MAX_URI, maxmet
     connection.method = Nullable(String(method))
     connection.uri = Nullable(String(uri))
     connection.httpversion = Nullable(String(version))
-    
+    if version != V1_0 && version != V1_1
+        # TODO: support HTTP/2.0
+        throw(HttpError(505, message="HTTP Version not supported", shouldclose=true))
+    end
     return connection
 end
 
-function readheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER, keepcomments=true)
-    if !isnull(connection.rawheaders)
-        throw(HttpError(500, message="Cannot read http connection headers when they have already been read", shouldclose=true))
-    end
-    
-    if isnull(connection.method)
-        throw(HttpError(500, message="Cannot read http connection headers before the requestline has been read", shouldclose=true))
-    end
-    
+function processheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER, keepcomments=true)
     headers = Vector{Pair{String,String}}()
     headername = Vector{UInt8}()
     headervalue = Vector{UInt8}()
@@ -254,7 +271,27 @@ function readheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER, keep
             headervalue = Vector{UInt8}()
             foundcolon = false
         elseif b == LF
-            throw(HttpError(400; message="Invalid request line (line terminator)", shouldclose=true))
+            if strict
+                throw(HttpError(400; message="Invalid header line (line terminator)", shouldclose=true))
+            elseif instring
+                throw(HttpError(400; message="Invalid header line (unterminated quoted string)", shouldclose=true))
+            elseif commentlevel != 0
+                throw(HttpError(400; message="Invalid header line (unterminated comment)", shouldclose=true))
+            elseif !foundcolon
+                if length(headername) == 0
+                    # last header found
+                    foundend = true
+                    break
+                else
+                    throw(HttpError(400; message="Invalid header line (missing name separator)", shouldclose=true))
+                end
+            end
+            
+            push!(headers, String(headername) => String(headervalue))
+            
+            headername = Vector{UInt8}()
+            headervalue = Vector{UInt8}()
+            foundcolon = false
         elseif !foundcolon
             if b == COLON
                 foundcolon = true
@@ -292,7 +329,14 @@ function readheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER, keep
                     foundcolon = false
                     continue
                 elseif b == LF
-                    throw(HttpError(400; message="Invalid header line (line terminator)", shouldclose=true))
+                    if strict
+                        throw(HttpError(400; message="Invalid header line (line terminator)", shouldclose=true))
+                    end
+                    push!(headers, String(headername) => String(headervalue))
+                    headername = Vector{UInt8}()
+                    headervalue = Vector{UInt8}()
+                    foundcolon = false
+                    continue
                 else
                     # Per rfc2616 section 4.2, multiple whitespace LWS characters may
                     # be replaced by a single space character without altering its meaning
@@ -378,10 +422,109 @@ function readheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER, keep
     end
     
     if !foundend
-        throw(HttpError(400; message="Unexpected end of file", shouldclose=true))
+        throw(HttpError(400; message="Unexpected end of stream", shouldclose=true))
     end
-    connection.rawheaders = Nullable(headers)
-    connection.headers = Headers(headers...)
     
-    connection;
+    headers
+end
+
+function readheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER, keepcomments=true)
+    if !isnull(connection.rawheaders)
+        throw(HttpError(500, message="Cannot read http connection headers when they have already been read", shouldclose=true))
+    end
+    
+    if isnull(connection.method)
+        throw(HttpError(500, message="Cannot read http connection headers before the requestline has been read", shouldclose=true))
+    end
+    
+    headers = processheaders!(connection; maxheader=maxheader, keepcomments=keepcomments)
+    connection.rawheaders = Nullable(headers)
+    connection.headers = Nullable(Headers(headers...))
+    
+    connection
+end
+
+function readtrailers!(connection::Connection; maxtrailer=DEFAULT_MAX_TRAILER, keepcomments=true)
+    if !connection.bodyfullyread
+        throw(HttpError(500, message="Cannot read http connection trailers when the body has not been processed", shouldclose=true))
+    end
+    
+    trailers = processheaders!(connection; maxheader=maxtrailer, keepcomments=keepcomments)
+    connection.rawtrailers = Nullable(trailers)
+    connection.trailers = Nullable(Headers(trailers...))
+    
+    connection
+end
+
+function createbodystream!(connection::Connection; maxsize=typemax(UInt64), maxtrailer=DEFAULT_MAX_TRAILER)
+    if isnull(connection.headers)
+        throw(HttpError(500; message="Cannot prepare body before headers have been parsed", shouldclose=true))
+    end
+    
+    headers = get(connection.headers)
+    
+    function onstart()
+        connection.bodystartedread = true
+    end
+    
+    function makesizedstream()
+        lengths = []
+        try
+            lengths = parse_header_value(headers["Content-Length"]; parameterized=false, permittedchars=DIGIT)
+        catch e
+            throw(HttpError(400; message="Invalid Content-Length header (invalid syntax)", shouldclose=true))
+        end
+        
+        function iterator(res, pair)
+            (v,) = pair
+            try
+                v = parse(UInt64, v, 10)
+            catch e
+                throw(HttpError(400; message="Invalid Content-Length header (field value must be a decimal number)", shouldclose=true))
+            end
+            if res == nothing || res == v
+                v
+            else
+                throw(HttpError(400; message="Invalid Content-Length header (multiple values do not match)", shouldclose=true))
+            end
+        end
+        length = reduce(iterator, nothing, lengths)
+        if length > maxsize
+            throw(HttpError(413; message="Content-Length too large", shouldclose=true))
+        end
+        function ondone()
+            connection.bodyfullyread = true
+        end
+        connection.bodystream = Nullable(SizedStream(connection.socket, length; ondone=ondone, onstart=onstart))
+    end
+    
+    if haskey(headers, "Transfer-Encoding")
+        encodings = nothing
+        try
+            # can extension encodings be parameterized?
+            encodings = parse_header_value(headers["Transfer-Encoding"])
+        catch e
+            throw(HttpError(400; message="Invalid Transfer-Encoding header (invalid syntax)", shouldclose=true))
+        end
+        hastransferencoding = reduce((res, encoding) -> res || (first(encoding) == "chunked"), false, encodings)
+        if !hastransferencoding && haskey(headers, "Content-Length")
+            makesizedstream()
+        elseif first(encodings[end]) != "chunked"
+            throw(HttpError(400; message="Invalid Transfer-Encoding header (chunked must be the last value)", shouldclose=true))
+        else
+            function ondone()
+                connection.bodyfullyread = true
+                readtrailers!(connection; maxtrailer=maxtrailer)
+            end
+            connection.bodystream = Nullable(ChunkedTransferDecodeStream(connection.socket; maxsize=maxsize, ondone=ondone, onstart=onstart))
+        end
+    elseif haskey(headers, "Content-Length")
+        makesizedstream()
+    else
+        # no body
+        connection.bodyfullyread = true
+        connection.bodystartedread = true
+    end
+    
+    connection
 end

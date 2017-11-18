@@ -6,5 +6,6 @@ include("./Pipeline.jl")
 include("./SizedStream.jl")
 include("./ChunkedTransferDecodeStream.jl")
 include("./Connection.jl")
+include("./Util.jl")
 
 end # module Spirit
