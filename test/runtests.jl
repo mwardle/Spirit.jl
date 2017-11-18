@@ -17,3 +17,11 @@ end
 @testset "Connection" begin
     include("test_connection.jl")
 end
+
+@testset "ChunkedTransferDecodeStream" begin
+    include("test_chunkedtransferdecodestream.jl")
+end
+
+@testset "SizedStream" begin
+    include("test_sizedstream.jl")
+end

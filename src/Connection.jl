@@ -29,7 +29,7 @@ const TEXT = union(setdiff(OCTETS, CTL), LWS)
 const HEX = union(DIGIT, Set(Vector{UInt8}("abcdefABCDEF")))
 const SEPARATOR = Set(Vector{UInt8}("()<>@,;:\\\"/[]?={} \t"))
 # const TOKEN = setdiff(setdiff(CHAR, SEPARATOR), CTL)
-const TOKEN = union(Set(Vector{UInt8}("!#$%&'*+-.^_`|~")), ALPHA, DIGIT)
+const TOKEN = union(Set(Vector{UInt8}("!#\$%&'*+-.^_`|~")), ALPHA, DIGIT)
 
 const URI_GENDELIMS = Set(Vector{UInt8}(":/?#[]@"))
 const URI_SUBDELIMS = Set(Vector{UInt8}("!\$&'()*+,;="))

@@ -17,9 +17,9 @@ function Base.read(s::SizedStream, ::Type{UInt8})
     end
     
     s.nread += 1
-    b = read(s.source)
-    if s.nread == s.size && !isnull(s.onsizeread)
-        get(s.onsizeread)()
+    b = read(s.source, UInt8)
+    if s.nread == s.size && !isnull(s.ondone)
+        get(s.ondone)()
     end
     b
 end
@@ -30,4 +30,8 @@ end
 
 function Base.isopen(s::SizedStream)
     return isopen(s.source)
+end
+
+function Base.close(s::SizedStream)
+    nothing
 end
