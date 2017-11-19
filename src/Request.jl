@@ -1,5 +1,5 @@
 struct Request
-    client::Client
+    connection::Connection
     method::AbstractString 
     uri::AbstractString
     httpversion::AbstractString
@@ -14,8 +14,12 @@ struct Request
     files::Dict{AbstractString,Any}
 end # Request
 
-function Request(client::Client, method::AbstractString, uri::AbstractString, httpversion::AbstractString, headers::Headers)
-    resource = uri # todo: this is just the path, fix this
+function Request(connection::Connection)
+    method = ''
+    uri = ''
+    httpversion = ''
+    headers = Headers()
+    resource = ''
     base = ''
     params = Dict{AbstractString, Any}()
     query = Dict{AbstractString, Any}()
@@ -23,7 +27,7 @@ function Request(client::Client, method::AbstractString, uri::AbstractString, ht
     cookies = Dict{AbstractString, Any}()
     session = Dict{AbstractString, Any}()
     files = Dict{AbstractString, Any}()
-    Request(client, method, uri, httpversion, headers, resource, base, params, query, body, cookies, session, files)
+    Request(connection, method, uri, httpversion, headers, resource, base, params, query, body, cookies, session, files)
 end
 
 function Request(req::Request; 

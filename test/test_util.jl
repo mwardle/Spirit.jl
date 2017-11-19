@@ -52,7 +52,7 @@ const Entries = Vector{Entry}
     
     # no parameters
     headervalue = "value1;q=0.5;r=b,value2;q=0"
-    @test_throws HttpError Spirit.parse_header_value(headervalue; parameterized=false)
+    @test_throws HTTPError Spirit.parse_header_value(headervalue; parameterized=false)
     
     headervalue = "value1,value2"
     parsed = Spirit.parse_header_value(headervalue)
@@ -71,13 +71,13 @@ const Entries = Vector{Entry}
     ])
     
     headervalue = ""
-    @test_throws HttpError Spirit.parse_header_value(headervalue; allowempty=false)
+    @test_throws HTTPError Spirit.parse_header_value(headervalue; allowempty=false)
     
     headervalue = "bird,"
-    @test_throws HttpError Spirit.parse_header_value(headervalue; allowempty=false)
+    @test_throws HTTPError Spirit.parse_header_value(headervalue; allowempty=false)
     
     headervalue = "bird,,salmon"
-    @test_throws HttpError Spirit.parse_header_value(headervalue; allowempty=false)
+    @test_throws HTTPError Spirit.parse_header_value(headervalue; allowempty=false)
     
     headervalue = "bird,,salmon"
     parsed = Spirit.parse_header_value(headervalue; allowempty=true)

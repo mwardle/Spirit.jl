@@ -24,7 +24,7 @@ httptest3 = include("./data/http/test3.jl")
     close(io)
 end
 
-@testset "readheaders" begin
+@testset "readheaders!" begin
     const io = IOBuffer(httptest1)
     const c = Connection(io)
 
@@ -123,4 +123,30 @@ end
     @test rawtrailers[2] == ("Author" => "Lewis Carroll")
     
     close(io)
+end
+
+@testset "processrequest!" begin
+    io = IOBuffer(httptest1)
+    c = Connection(io)
+    Spirit.processrequest!(c)
+    close(io)
+end
+
+@testset "writeresponse!" begin
+    io = IOBuffer()
+    c = Connection(io)
+    
+    body = "Safety First"
+    bodyio = IOBuffer(body)
+    headers = Spirit.Headers("Content-Length" => string(length(body)))
+    Spirit.writeresponse!(c, 200, "OK", headers, bodyio)
+    
+    response = take!(io)
+    
+    expected = "HTTP/1.1 200 OK\r\n" *
+        "Content-Length: 12\r\n" *
+        "\r\n" *
+        "Safety First"
+        
+    @test expected == String(response)
 end

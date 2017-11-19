@@ -22,7 +22,7 @@ function Base.read(s::ChunkedTransferDecodeStream, ::Type{UInt8})
     b = read(s.source, UInt8)
     s.nread += 1
     if s.nread >= s.maxsize
-        throw(HttpError(413; message="Unwilling to process a request entity with total size greater than $(s.maxsize)", shouldclose=true))
+        throw(HTTPError(413; message="Unwilling to process a request entity with total size greater than $(s.maxsize)", shouldclose=true))
     end
     b
 end
@@ -68,7 +68,7 @@ function readchunksize(s::ChunkedTransferDecodeStream)
         s.nread += 1
         while in(b, HEX) && isopen(source)
             if s.nread >= s.maxsize
-                throw(HttpError(413; message="Unwilling to process a request entity with total size greater than $(s.maxsize)", shouldclose=true))
+                throw(HTTPError(413; message="Unwilling to process a request entity with total size greater than $(s.maxsize)", shouldclose=true))
             end
             push!(hexbytes, b)
             b = read(source, UInt8)
@@ -76,7 +76,7 @@ function readchunksize(s::ChunkedTransferDecodeStream)
         end
         
         if length(hexbytes) == 0
-            throw(HttpError(400; message="Chunked transfer encoding is missing chunksize at position $(s.nread) (found $(b))", shouldclose=true))
+            throw(HTTPError(400; message="Chunked transfer encoding is missing chunksize at position $(s.nread) (found $(b))", shouldclose=true))
         end
         
         extcount = 0
@@ -87,10 +87,10 @@ function readchunksize(s::ChunkedTransferDecodeStream)
         while b != CR && b != LF && isopen(source)
             extcount += 1
             if extcount > 1024
-                throw(HttpError(400; message="Unwilling to parse a chunked encoding extension greater than 1024 bytes", shouldclose=true))
+                throw(HTTPError(400; message="Unwilling to parse a chunked encoding extension greater than 1024 bytes", shouldclose=true))
             end
             if s.nread >= s.maxsize
-                throw(HttpError(413; message="Unwilling to process a request entity with total size greater than $(s.maxsize)", shouldclose=true))
+                throw(HTTPError(413; message="Unwilling to process a request entity with total size greater than $(s.maxsize)", shouldclose=true))
             end
             
             b = read(source, UInt8)
@@ -98,11 +98,11 @@ function readchunksize(s::ChunkedTransferDecodeStream)
         end
         
         if b == LF
-            throw(HttpError(400; message="Invalid line ending in chunked encoding after chunk size", shouldclose=true))
+            throw(HTTPError(400; message="Invalid line ending in chunked encoding after chunk size", shouldclose=true))
         end
         
         if s.nread >= s.maxsize
-            throw(HttpError(413; message="Unwilling to process a request entity with total size greater than $(s.maxsize)", shouldclose=true))
+            throw(HTTPError(413; message="Unwilling to process a request entity with total size greater than $(s.maxsize)", shouldclose=true))
         end
         
         if b == CR && isopen(source)
@@ -111,17 +111,17 @@ function readchunksize(s::ChunkedTransferDecodeStream)
             
             foundend = true
             if s.nread >= s.maxsize
-                throw(HttpError(413; message="Unwilling to process a request entity with total size greater than $(s.maxsize)", shouldclose=true))
+                throw(HTTPError(413; message="Unwilling to process a request entity with total size greater than $(s.maxsize)", shouldclose=true))
             end
             if b != LF
-                throw(HttpError(400; message="Invalid line ending in chunked encoding after chunk size", shouldclose=true))
+                throw(HTTPError(400; message="Invalid line ending in chunked encoding after chunk size", shouldclose=true))
             end
         end
     end
     
     if !foundend
         # source must have closed unexpectedly
-        throw(HttpError(400; "Unexpected end of entity data while decoding chunked transfer encoding", shouldclose=true))
+        throw(HTTPError(400; "Unexpected end of entity data while decoding chunked transfer encoding", shouldclose=true))
     end
     
     try
@@ -129,9 +129,9 @@ function readchunksize(s::ChunkedTransferDecodeStream)
         # println("CHUNK SIZE:", s.chunksize)
     catch e
         if isa(e, OverflowError)
-            throw(HttpError(413; "Chunk size too large to be parsed", shouldclose=true))
+            throw(HTTPError(413; "Chunk size too large to be parsed", shouldclose=true))
         else
-            throw(HttpError(500; "Unexpected error occurred", shouldclose=true, data=Dict{AbstractString, Any}(error => e)))
+            throw(HTTPError(500; "Unexpected error occurred", shouldclose=true, data=Dict{AbstractString, Any}(error => e)))
         end
     end
     

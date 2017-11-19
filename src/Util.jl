@@ -44,7 +44,7 @@ function parse_header_value(header::AbstractString; headername::AbstractString="
             elseif in(b, TEXT)
                 push!(buffer, char)
             else
-                throw(HttpError(400; message="Invalid $headername header (charcode $char not allowed in quoted-string)"))
+                throw(HTTPError(400; message="Invalid $headername header (charcode $char not allowed in quoted-string)"))
             end
         elseif char == EOF || (multi && char == COMMA)
             if parsingparamval
@@ -60,7 +60,7 @@ function parse_header_value(header::AbstractString; headername::AbstractString="
             add = true
             if length(value) == 0
                 if !allowempty
-                    throw(HttpError(400; message="Invalid $headername header (empty value)"))
+                    throw(HTTPError(400; message="Invalid $headername header (empty value)"))
                 elseif filterempty
                     add = false
                 end
@@ -89,7 +89,7 @@ function parse_header_value(header::AbstractString; headername::AbstractString="
                 value = String(buff)
             end
             if length(value) == 0 && !allowempty
-                throw(HttpError(400; message="Invalid $headername header (empty value)"))
+                throw(HTTPError(400; message="Invalid $headername header (empty value)"))
             end
             buff = Vector{UInt8}()
             parsingparamkey = true
@@ -108,13 +108,13 @@ function parse_header_value(header::AbstractString; headername::AbstractString="
                 lws = true
             else
                 if tws
-                    throw(HttpError(400; message="Invalid $headername header (invalid parameter key)"))
+                    throw(HTTPError(400; message="Invalid $headername header (invalid parameter key)"))
                 elseif in(char, TOKEN)
                     push!(buff, char)
                 elseif in(char, LWS)
                     tws = true
                 else
-                    throw(HttpError(400; message="Invalid $headername header (invalid parameter key)"))
+                    throw(HTTPError(400; message="Invalid $headername header (invalid parameter key)"))
                 end
                 lws=false
             end
@@ -122,17 +122,17 @@ function parse_header_value(header::AbstractString; headername::AbstractString="
             if lws && char == QUOTE
                 inquote = true
             elseif tws
-                throw(HttpError(400; message="Invalid $headername header (invalid parameter value)"))
+                throw(HTTPError(400; message="Invalid $headername header (invalid parameter value)"))
             elseif in(char, TOKEN)
                 push!(buff, char)
             elseif in(char, LWS)
                 tws = true
             else
-                throw(HttpError(400; message="Invalid $headername header (invalid parameter value)"))
+                throw(HTTPError(400; message="Invalid $headername header (invalid parameter value)"))
             end
             lws=false
         elseif tws
-            throw(HttpError(400; message="Invalid $headername header (invalid value)"))
+            throw(HTTPError(400; message="Invalid $headername header (invalid value)"))
         elseif in(char, permittedchars)
             push!(buff, char)
             lws = false
@@ -140,7 +140,7 @@ function parse_header_value(header::AbstractString; headername::AbstractString="
         elseif in(char, LWS)
             tws = true
         else
-            throw(HttpError(400; message="Invalid $headername header (unpermitted bytecode)"))
+            throw(HTTPError(400; message="Invalid $headername header (unpermitted bytecode)"))
         end
     end
     

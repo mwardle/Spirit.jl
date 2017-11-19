@@ -1,6 +1,6 @@
-export HttpError
+export HTTPError
 
-struct HttpError <: Exception
+struct HTTPError <: Exception
     code::UInt16
     message::AbstractString
     data::Dict{AbstractString, Any}
@@ -8,11 +8,11 @@ struct HttpError <: Exception
     shouldclose::Bool
 end
 
-function HttpError(code::Integer;
+function HTTPError(code::Integer;
     message::AbstractString="", 
     data::Dict{AbstractString, Any}=Dict{AbstractString, Any}(), 
     safe::Bool=code<500,
     shouldclose::Bool=false)
     
-    HttpError(code, message, data, safe, shouldclose)
+    HTTPError(code, message, data, safe, shouldclose)
 end

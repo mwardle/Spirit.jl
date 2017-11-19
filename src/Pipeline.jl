@@ -4,7 +4,7 @@ struct Pipeline
     exec::Function
 end # Pipeline
 
-function resolve_continuation(continuation)
+function resolve_future(continuation)
     isa(continuation, Future) ? fetch(continuation) : continuation
 end # resolveContinuation
 
@@ -14,7 +14,7 @@ const pipeline_reducer = function(prevpipe, nextpipe)
             if isfin(continuation)
                 continuation
             else
-                continuation = resolve_continuation(prevpipe(continuation...))
+                continuation = resolve_future(prevpipe(continuation...))
                 nextpipe(continuation)
             end
         end
@@ -49,7 +49,7 @@ function Base.run(p::Pipeline, data...)::Continuation
 end # run
 
 function (pipe::Pipeline)(continuation::Continuation)::Continuation
-    resolve_continuation(pipe.exec(continuation))
+    resolve_future(pipe.exec(continuation))
 end # Pipeline()
 
 """
