@@ -29,3 +29,7 @@ end
 @testset "SizedStream" begin
     include("test_sizedstream.jl")
 end
+
+@testset "URI" begin
+    include("test_uri.jl")
+end

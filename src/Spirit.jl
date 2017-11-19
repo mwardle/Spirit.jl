@@ -1,6 +1,7 @@
 module Spirit
 include("./constants.jl")
 include("./HTTPError.jl")
+include("./URI.jl")
 include("./Headers.jl")
 include("./Continuation.jl")
 include("./Pipeline.jl")
