@@ -82,21 +82,21 @@ end
 
 function Connection(socket::IO)
     Connection(socket, 
-        Nullable{String}(), 
-        Nullable{String}(), 
-        Nullable{String}(), 
-        Nullable{Vector{String}}(),
-        Nullable{Headers}(),
-        Nullable{IO}(),
-        Nullable{Vector{String}}(),
-        Nullable{Headers}(),
+        nothing, 
+        nothing, 
+        nothing, 
+        nothing,
+        nothing,
+        nothing,
+        nothing,
+        nothing,
         false,
         false,
         false)
 end
 
 function readrequestline!(connection::Connection; maxuri=DEFAULT_MAX_URI, maxmethod=DEFAULT_MAX_METHOD, maxversion=DEFAULT_MAX_VERSION, strict=false)
-    if !isnull(connection.method)
+    if !isequal(nothing, connection.method)
         throw(HTTPError(500; message="Cannot read http connection request line when it has already been read", shouldclose=true))
     end
     
@@ -215,9 +215,12 @@ function readrequestline!(connection::Connection; maxuri=DEFAULT_MAX_URI, maxmet
     if !foundend
         throw(HTTPError(400; message="Unexpected end of file", shouldclose=true))
     end
-    connection.method = Nullable(String(method))
-    connection.uri = Nullable(String(uri))
-    connection.httpversion = Nullable(String(version))
+    connection.method = String(method)
+    connection.uri = String(uri)
+    # copy here is necessary because `String` method seems to be consuming contents of the byte array
+    # this has to be a big in Julia
+    connection.httpversion = String(copy(version))
+
     if version != V1_0 && version != V1_1
         # TODO: support HTTP/2.0
         throw(HTTPError(505, message="HTTP Version not supported", shouldclose=true))
@@ -400,7 +403,8 @@ function processheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER, k
                 # TODO: This is not valid in the middle of a text header field
                 push!(headervalue, b)
                 instring = true
-            elseif b == LEFTPAREN && in(lowercase(String(headername)), COMMENTABLE_HEADER_FIELDS)
+            elseif b == LEFTPAREN && in(lowercase(String(copy(headername))), COMMENTABLE_HEADER_FIELDS)
+                # Dirty dirty bug consumes my 
                 if keepcomments
                     push!(headervalue, b)
                 end
@@ -432,17 +436,17 @@ function processheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER, k
 end
 
 function readheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER, keepcomments=true, strict=false)
-    if !isnull(connection.rawheaders)
+    if !isequal(nothing, connection.rawheaders)
         throw(HTTPError(500, message="Cannot read http connection headers when they have already been read", shouldclose=true))
     end
     
-    if isnull(connection.method)
+    if isequal(nothing, connection.method)
         throw(HTTPError(500, message="Cannot read http connection headers before the requestline has been read", shouldclose=true))
     end
     
     headers = processheaders!(connection; maxheader=maxheader, keepcomments=keepcomments, strict=strict)
-    connection.rawheaders = Nullable(headers)
-    connection.headers = Nullable(Headers(headers...))
+    connection.rawheaders = headers
+    connection.headers = Headers(headers...)
     
     connection
 end
@@ -453,18 +457,18 @@ function readtrailers!(connection::Connection; maxtrailer=DEFAULT_MAX_TRAILER, k
     end
     
     trailers = processheaders!(connection; maxheader=maxtrailer, keepcomments=keepcomments, strict=strict)
-    connection.rawtrailers = Nullable(trailers)
-    connection.trailers = Nullable(Headers(trailers...))
+    connection.rawtrailers = trailers
+    connection.trailers = Headers(trailers...)
     
     connection
 end
 
 function createbodystream!(connection::Connection; maxbody=DEFAULT_MAX_BODY, maxtrailer=DEFAULT_MAX_TRAILER)
-    if isnull(connection.headers)
+    if isequal(nothing, connection.headers)
         throw(HTTPError(500; message="Cannot prepare body before headers have been parsed", shouldclose=true))
     end
     
-    headers = get(connection.headers)
+    headers = connection.headers
     
     function onstart()
         connection.bodystartedread = true
@@ -481,7 +485,7 @@ function createbodystream!(connection::Connection; maxbody=DEFAULT_MAX_BODY, max
         function iterator(res, pair)
             (v,) = pair
             try
-                v = parse(UInt64, v, 10)
+                v = parse(UInt64, v, base=10)
             catch e
                 throw(HTTPError(400; message="Invalid Content-Length header (field value must be a decimal number)", shouldclose=true))
             end
@@ -491,14 +495,14 @@ function createbodystream!(connection::Connection; maxbody=DEFAULT_MAX_BODY, max
                 throw(HTTPError(400; message="Invalid Content-Length header (multiple values do not match)", shouldclose=true))
             end
         end
-        length = reduce(iterator, nothing, lengths)
+        length = reduce(iterator, lengths; init=nothing)
         if length > maxbody
             throw(HTTPError(413; message="Content-Length too large", shouldclose=true))
         end
         function ondone()
             connection.bodyfullyread = true
         end
-        connection.bodystream = Nullable(SizedStream(connection.socket, length; ondone=ondone, onstart=onstart))
+        connection.bodystream = SizedStream(connection.socket, length; ondone=ondone, onstart=onstart)
     end
     
     if haskey(headers, "Transfer-Encoding")
@@ -509,7 +513,7 @@ function createbodystream!(connection::Connection; maxbody=DEFAULT_MAX_BODY, max
         catch e
             throw(HTTPError(400; message="Invalid Transfer-Encoding header (invalid syntax)", shouldclose=true))
         end
-        hastransferencoding = reduce((res, encoding) -> res || (first(encoding) == "chunked"), false, encodings)
+        hastransferencoding = reduce((res, encoding) -> res || (first(encoding) == "chunked"), encodings; init = false)
         if !hastransferencoding && haskey(headers, "Content-Length")
             makesizedstream()
         elseif first(encodings[end]) != "chunked"
@@ -519,7 +523,7 @@ function createbodystream!(connection::Connection; maxbody=DEFAULT_MAX_BODY, max
                 connection.bodyfullyread = true
                 readtrailers!(connection; maxtrailer=maxtrailer)
             end
-            connection.bodystream = Nullable(ChunkedTransferDecodeStream(connection.socket; maxsize=maxbody, ondone=ondone, onstart=onstart))
+            connection.bodystream = ChunkedTransferDecodeStream(connection.socket; maxsize=maxbody, ondone=ondone, onstart=onstart)
         end
     elseif haskey(headers, "Content-Length")
         makesizedstream()

@@ -11,11 +11,11 @@ function Headers()
     Headers(Dict{AbstractString, AbstractString}(), Dict{AbstractString, AbstractString}())
 end
 
-function Headers{K <: AbstractString,V <: AbstractString}(entries::Pair{K,V}...)
+function Headers(entries::Pair{K,V}...) where {K <: AbstractString, V <: AbstractString}
     function reducer(headers, entry)
         append(headers, first(entry), last(entry))
     end
-    reduce(reducer, Headers(), entries)
+    reduce(reducer, entries; init=Headers())
 end
 
 function Base.getindex(headers::Headers, name::AbstractString)
@@ -98,15 +98,17 @@ function Base.show(io::IO, headers::Headers)
     print(io, ")")
 end
 
-Base.start(headers::Headers) = Base.start(headers.data)
-Base.done(headers::Headers, state) = Base.done(headers.data, state)
-Base.next(headers::Headers, state) = Base.next(headers.data, state)
+Base.iterate(headers::Headers) = Base.iterate(headers.data)
+Base.iterate(headers::Headers, state) = Base.iterate(headers.data, state)
+# Base.start(headers::Headers) = Base.start(headers.data)
+# Base.done(headers::Headers, state) = Base.done(headers.data, state)
+# Base.next(headers::Headers, state) = Base.next(headers.data, state)
 Base.isempty(headers::Headers) = Base.isempty(headers.data)
 Base.length(headers::Headers) = Base.length(headers.data)
 Base.eltype(headers::Headers) = Base.eltype(headers.data)
 Base.keytype(headers::Headers) = Base.keytype(headers.data)
 Base.valtype(headers::Headers) = Base.valtype(headers.data)
-Base.reduce(fn, init, headers::Headers) = Base.reduce(fn, init, headers.data)
+Base.reduce(fn, headers::Headers; init=nothing) = Base.reduce(fn, headers.data; init=init)
 Base.keys(headers::Headers) = Base.keys(headers.data)
 Base.values(headers::Headers) = Base.values(headers.data)
 function Base.merge(headers::Headers, others::Headers...)

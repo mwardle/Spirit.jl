@@ -33,7 +33,9 @@ function Base.show(io::IO, cont::Continuation)
     
     print(io, ")")
 end
-    
-Base.start(c::Continuation) = Base.start(c.data)
-Base.done(c::Continuation, state) = Base.done(c.data, state)
-Base.next(c::Continuation, state) = Base.next(c.data, state)
+
+Base.iterate(c::Continuation) = Base.iterate(c.data)
+Base.iterate(c::Continuation, state) = Base.iterate(c.data, state) 
+# Base.start(c::Continuation) = Base.start(c.data)
+# Base.done(c::Continuation, state) = Base.done(c.data, state)
+# Base.next(c::Continuation, state) = Base.next(c.data, state)

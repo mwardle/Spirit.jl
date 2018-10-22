@@ -65,4 +65,3 @@ end
     @test haskey(headers, "content-type") == true
     @test haskey(modified, "content-type") == false
 end
-

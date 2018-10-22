@@ -3,38 +3,38 @@ httptest2 = include("./data/http/test2.jl")
 httptest3 = include("./data/http/test3.jl")
 
 @testset "readrequestline" begin
-    const io = IOBuffer(httptest1)
-    const c = Connection(io)
+    io = IOBuffer(httptest1)
+    c = Connection(io)
     
     Spirit.readrequestline!(c)
     
-    @test get(c.method) == "POST"
-    @test get(c.uri) == "/"
-    @test get(c.httpversion) == "1.1"
+    @test c.method == "POST"
+    @test c.uri == "/"
+    @test c.httpversion == "1.1"
     close(io)
     
-    const io = IOBuffer(httptest2)
-    const c = Connection(io)
+    io = IOBuffer(httptest2)
+    c = Connection(io)
     
     Spirit.readrequestline!(c)
     
-    @test get(c.method) == "GET"
-    @test get(c.uri) == "/docs/index.html"
-    @test get(c.httpversion) == "1.1"
+    @test c.method == "GET"
+    @test c.uri == "/docs/index.html"
+    @test c.httpversion == "1.1"
     close(io)
 end
 
 @testset "readheaders!" begin
-    const io = IOBuffer(httptest1)
-    const c = Connection(io)
+    io = IOBuffer(httptest1)
+    c = Connection(io)
 
     Spirit.readrequestline!(c)
     Spirit.readheaders!(c)
     
-    @test !isnull(c.rawheaders)
-    @test !isnull(c.headers)
-    rawheaders = get(c.rawheaders)
-    headers = get(c.headers)
+    @test !isequal(nothing, c.rawheaders)
+    @test !isequal(nothing, c.headers)
+    rawheaders = c.rawheaders
+    headers = c.headers
     @test length(rawheaders) == 2
     @test length(headers) == 2
     @test rawheaders[1] == ("Host" => "www.somewhere.com")
@@ -42,16 +42,16 @@ end
     
     close(io)
     
-    const io = IOBuffer(httptest2)
-    const c = Connection(io)
+    io = IOBuffer(httptest2)
+    c = Connection(io)
 
     Spirit.readrequestline!(c)
     Spirit.readheaders!(c)
     
-    @test !isnull(c.rawheaders)
-    @test !isnull(c.headers)
-    rawheaders = get(c.rawheaders)
-    headers = get(c.headers)
+    @test !isequal(nothing, c.rawheaders)
+    @test !isequal(nothing, c.headers)
+    rawheaders = c.rawheaders
+    headers = c.headers
     @test length(rawheaders) == 5
     @test length(headers) == 5
     @test rawheaders[1] == ("Host" => "www.nowhere123.com")
@@ -73,16 +73,16 @@ end
     Spirit.readheaders!(c)
     Spirit.createbodystream!(c)
     
-    @test isnull(c.bodystream) == false
-    @test isa(get(c.bodystream), SizedStream)
-    @test get(c.bodystream).size == 9
+    @test isequal(nothing, c.bodystream) == false
+    @test isa(c.bodystream, SizedStream)
+    @test c.bodystream.size == 9
     @test c.bodystartedread == false
     @test c.bodyfullyread == false
-    b = read(get(c.bodystream), UInt8)
+    b = read(c.bodystream, UInt8)
     @test b == UInt8('B')
     @test c.bodystartedread == true
     @test c.bodyfullyread == false
-    str = read(get(c.bodystream))
+    str = read(c.bodystream)
     @test c.bodystartedread == true
     @test c.bodyfullyread == true
     @test String(str) == "ody Body"
@@ -96,17 +96,17 @@ end
     Spirit.readheaders!(c)
     Spirit.createbodystream!(c)
     
-    @test isnull(c.bodystream) == false
-    @test isa(get(c.bodystream), ChunkedTransferDecodeStream)
+    @test isequal(nothing, c.bodystream) == false
+    @test isa(c.bodystream, ChunkedTransferDecodeStream)
     @test c.bodystartedread == false
     @test c.bodyfullyread == false
-    b = read(get(c.bodystream), UInt8)
+    b = read(c.bodystream, UInt8)
     @test b == UInt8('\'')
     @test c.bodystartedread == true
     @test c.bodyfullyread == false
-    @test isnull(c.trailers) == true
-    @test isnull(c.rawtrailers) == true
-    str = read(get(c.bodystream))
+    @test isequal(nothing, c.trailers) == true
+    @test isequal(nothing, c.rawtrailers) == true
+    str = read(c.bodystream)
     @test c.bodystartedread == true
     @test c.bodyfullyread == true
     expected = "Twas brillig, and the slithy toves\n" *
@@ -114,10 +114,10 @@ end
         "All mimsy were the borogoves,\n" *
         "      And the mome raths outgrabe."
     @test String(str) == expected
-    @test isnull(c.trailers) == false
-    @test isnull(c.rawtrailers) == false
+    @test isequal(nothing, c.trailers) == false
+    @test isequal(nothing, c.rawtrailers) == false
 
-    rawtrailers = get(c.rawtrailers)
+    rawtrailers = c.rawtrailers
     @test length(rawtrailers) == 2
     @test rawtrailers[1] == ("Happiness" => "100")
     @test rawtrailers[2] == ("Author" => "Lewis Carroll")

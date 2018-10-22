@@ -8,7 +8,7 @@ end
 
 function createpipelinehandler(opts)
     opts = Dict{Symbol, Any}(opts)
-    const fn = function(socket::IO)
+    fn = function(socket::IO)
         connection = Connection(socket)
         allowedopts = [
             :maxheader, 
@@ -36,6 +36,7 @@ function createpipelinehandler(opts)
 end
 
 function HTTPServer(io::Base.IOServer, p::Pipeline; options...)
+    
     fallthroughhandler = function(conn)
         # TODO: content negotation
         throw(HTTPError(404; message="Not Found"))
@@ -70,7 +71,7 @@ function HTTPServer(io::Base.IOServer, p::Pipeline; options...)
     p = recover(p, errorhandler)
     p = pipe(createpipelinehandler(options), p)
     handler = function(socket::IO)
-        @spawn begin
+        Distributed.@spawn begin
             println("running handler")
             run(p, socket)
             true

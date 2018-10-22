@@ -1,5 +1,6 @@
 using Spirit
-using Base.Test
+using Test
+using Sockets
 
 # write your own tests here
 @testset "Headers" begin

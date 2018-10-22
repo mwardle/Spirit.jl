@@ -1,4 +1,8 @@
 module Spirit
+using Sockets
+using Distributed
+
+const Nullable{T} = Union{T,Nothing}
 include("./constants.jl")
 include("./HTTPError.jl")
 include("./URI.jl")

@@ -3,13 +3,16 @@ export parse_header_value
 const NOOP = (args...) -> nothing
 const IDENTITY = (v, args...) -> v
 
+const Param = Pair{AbstractString,AbstractString}
+const Params = Vector{Param}
+const Entry = Pair{AbstractString,Params}
+const Entries = Vector{Entry}
+
+const EOF = nothing
+
 function parse_header_value(header::AbstractString; headername::AbstractString="", parameterized=true, multi=true, paramsep=UInt8(';'), permittedchars=TOKEN, allowempty=false, filterempty=false)
     paramsep = UInt8(paramsep)
-    
-    const Param = Pair{AbstractString,AbstractString}
-    const Params = Vector{Param}
-    const Entry = Pair{AbstractString,Params}
-    const Entries = Vector{Entry}
+
     entries = Entries()
     header = string(header)
     value = ""
@@ -25,8 +28,7 @@ function parse_header_value(header::AbstractString; headername::AbstractString="
     inescape = false
     parsingparamkey = false
     parsingparamval = false
-    const EOF = nothing
-    const maxind = length(header)+1
+    maxind = length(header)+1
     for i in 1:maxind
         char = i == maxind ? EOF : UInt8(header[i])
         if (lws || tws) && in(char, LWS)

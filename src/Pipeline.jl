@@ -40,7 +40,7 @@ run(p, req, res)
 ```
 """
 function pipe(stages::Union{Function,Pipeline}...)::Pipeline
-    exec = foldr(pipeline_reducer, c -> c, stages)
+    exec = foldr(pipeline_reducer, stages; init=c -> c)
     Pipeline(exec)
 end # pipe
 

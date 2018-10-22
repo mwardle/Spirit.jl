@@ -4,17 +4,17 @@ const uriregex = r"^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?"
 const authorityregex = r"^(([^/?#\[\]]*)@)?(([^:/?#\[\]@]+)|(\[([^/?#@\[\]]+)\]))(:([0-9]+))?$"
 const ipv4regex = r"^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$"
 struct URIAuthority
-    userinfo::Union{AbstractString,Void}
-    host::Union{AbstractString,IPv4,IPv6,Void}
-    port::Union{UInt,Void}
+    userinfo::Union{AbstractString,Nothing}
+    host::Union{AbstractString,IPv4,IPv6,Nothing}
+    port::Union{UInt,Nothing}
 end # struct URIAuthority
 
 struct URI
-    scheme::Union{AbstractString,Void}
-    authority::Union{URIAuthority,Void}
-    path::Union{AbstractString,Void}
-    query::Union{AbstractString,Void}
-    fragment::Union{AbstractString,Void}
+    scheme::Union{AbstractString,Nothing}
+    authority::Union{URIAuthority,Nothing}
+    path::Union{AbstractString,Nothing}
+    query::Union{AbstractString,Nothing}
+    fragment::Union{AbstractString,Nothing}
 end # struct URI
 
 
@@ -27,7 +27,7 @@ function URIAuthority(authority::AbstractString)
     
     userinfo = parts[2]
     host = if parts[4] != nothing
-        if ismatch(ipv4regex, parts[4])
+        if occursin(ipv4regex, parts[4])
             try
                 IPv4(parts[4])
             catch e

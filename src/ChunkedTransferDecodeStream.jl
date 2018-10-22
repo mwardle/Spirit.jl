@@ -121,17 +121,16 @@ function readchunksize(s::ChunkedTransferDecodeStream)
     
     if !foundend
         # source must have closed unexpectedly
-        throw(HTTPError(400; "Unexpected end of entity data while decoding chunked transfer encoding", shouldclose=true))
+        throw(HTTPError(400; message="Unexpected end of entity data while decoding chunked transfer encoding", shouldclose=true))
     end
     
     try
-        s.chunksize = parse(UInt64, String(hexbytes), 16)
-        # println("CHUNK SIZE:", s.chunksize)
+        s.chunksize = parse(UInt64, String(hexbytes), base = 16)
     catch e
         if isa(e, OverflowError)
-            throw(HTTPError(413; "Chunk size too large to be parsed", shouldclose=true))
+            throw(HTTPError(413; message="Chunk size too large to be parsed", shouldclose=true))
         else
-            throw(HTTPError(500; "Unexpected error occurred", shouldclose=true, data=Dict{AbstractString, Any}(error => e)))
+            throw(HTTPError(500; message="An unexpected error occurred", shouldclose=true, data=Dict{AbstractString, Any}("error" => e)))
         end
     end
     
