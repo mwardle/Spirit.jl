@@ -47,10 +47,10 @@ function HTTPServer(io::Base.IOServer, p::Pipeline; options...)
             error = HTTPError(500)
         end
         
-        statusCode = error.code
-        statusMessage = STATUS_CODES[statusCode]
+        status_code = error.code
+        status_message = STATUS_CODES[status_code]
         safe = error.safe
-        message = safe ? error.message : statusMessage
+        message = safe ? error.message : status_message
         shoudclose = error.shouldclose
         contentlength = length(message)
         
@@ -59,7 +59,7 @@ function HTTPServer(io::Base.IOServer, p::Pipeline; options...)
             "Content-Type" => "text/plain;charset=utf-8"
         )
         
-        writeresponse!(conn, statusCode, statusMessage, headers, IOBuffer(message))
+        writeresponse!(conn, status_code, status_message, headers, IOBuffer(message))
         
         if shouldclose
             close(conn.socket)
