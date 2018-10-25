@@ -11,7 +11,7 @@ end # resolveContinuation
 const pipeline_reducer = function(prevpipe, nextpipe)
     if (isa(prevpipe, Function))
         function(continuation)
-            if isfin(continuation)
+            if isdone(continuation)
                 continuation
             else
                 continuation = resolve_future(prevpipe(continuation...))
@@ -32,8 +32,8 @@ Create an http handler pipe.
 
 ```julia
 p = pipe([
-    (req::Request, res::Response) -> cont(req, setheader(res, "X-Powered-By", "Spirit")),
-    (req::Request, res::Response) -> fin(req, respond_text(res, "A text response...")) 
+    (req::Request, res::Response) -> next(req, setheader(res, "X-Powered-By", "Spirit")),
+    (req::Request, res::Response) -> done(req, respond_text(res, "A text response...")) 
 ])
 
 run(p, req, res)
@@ -45,7 +45,7 @@ function pipe(stages::Union{Function,Pipeline}...)::Pipeline
 end # pipe
 
 function Base.run(p::Pipeline, data...)::Continuation
-    p(cont(data...))
+    p(next(data...))
 end # run
 
 function (pipe::Pipeline)(continuation::Continuation)::Continuation
@@ -55,15 +55,15 @@ end # Pipeline()
 """
     resume(Pipeline, Pipeline|Function)
     
-Continue a pipe that is fin.
+Continue a pipe that is done.
 
 ```julia
 p = pipe([
-    (req, res) -> fin(req, respond_text("this is wrong"))
+    (req, res) -> done(req, respond_text("this is wrong"))
 ])
 
 p = resume(p, pipe([
-    (req, res) -> fin(req, respond_text("this is right"))
+    (req, res) -> done(req, respond_text("this is right"))
 ]))
 ```
 """
@@ -71,10 +71,10 @@ function resume(first::Pipeline, stages::Union{Pipeline,Function}...; always::Bo
     second = pipe(stages...)
     exec = function(continuation)
         continuation = first(continuation)
-        if iscont(continuation) && !always
+        if isnext(continuation) && !always
             continuation
         else
-            second(cont(continuation...))
+            second(next(continuation...))
         end
     end
 

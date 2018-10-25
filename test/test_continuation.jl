@@ -1,27 +1,27 @@
-@testset "fin" begin
-    c = fin("v", 1)
+@testset "done" begin
+    c = done("v", 1)
     
     @test typeof(c) <: Continuation
     @test typeof(c) == Continuation{Tuple{String, Int64}}
     @test c.data == ("v", 1)
-    @test c.state == Finish
+    @test c.state == Done
 end
 
-@testset "cont" begin
-    c = cont("v", 1)
+@testset "next" begin
+    c = next("v", 1)
     
     @test typeof(c) <: Continuation
     @test typeof(c) == Continuation{Tuple{String, Int64}}
     @test c.data == ("v", 1)
-    @test c.state == Continue
+    @test c.state == Next
 end
 
-@testset "isfin" begin
-    @test isfin(fin("v", 1)) == true
-    @test isfin(cont("v", 1)) == false
+@testset "isdone" begin
+    @test isdone(done("v", 1)) == true
+    @test isdone(next("v", 1)) == false
 end
 
-@testset "iscont" begin
-    @test iscont(fin("v", 1)) == false
-    @test iscont(cont("v", 1)) == true
+@testset "isnext" begin
+    @test isnext(done("v", 1)) == false
+    @test isnext(next("v", 1)) == true
 end

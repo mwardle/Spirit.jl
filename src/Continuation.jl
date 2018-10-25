@@ -1,28 +1,28 @@
-export fin, cont, isfin, iscont, Continuation, Finish, Continue
+export done, next, isdone, isnext, Continuation, Done, Next
 
-@enum ContinuationState Finish Continue
+@enum ContinuationState Done Next
 
 struct Continuation{T <: Tuple}
     state::ContinuationState
     data::T
 end # Continuation
 
-isfin(continuation::Continuation) = continuation.state == Finish
-iscont(continuation::Continuation) = continuation.state == Continue
+isdone(continuation::Continuation) = continuation.state == Done
+isnext(continuation::Continuation) = continuation.state == Next
 
-fin(args...) = Continuation(Finish, tuple(args...))
-cont(args...) = Continuation(Continue, tuple(args...))
+done(args...) = Continuation(Done, tuple(args...))
+next(args...) = Continuation(Next, tuple(args...))
 
-function Base.show(io::IO, cont::Continuation)
+function Base.show(io::IO, next::Continuation)
     
-    if cont.state == Finish
-        print(io, "fin(")
+    if next.state == Done
+        print(io, "done(")
     else
-        print(io, "cont(")
+        print(io, "next(")
     end
     
     comma = false
-    for v in cont
+    for v in next
         if comma
             print(io, ", ")
         end

@@ -3,36 +3,36 @@
     # basic usage
     @test isa(pipe, Function)
     p = pipe(
-        (v) -> cont(v + 1),
-        (v) -> fin(v * 2) )
+        (v) -> next(v + 1),
+        (v) -> done(v * 2) )
     
     @test isa(p, Pipeline)
     
     c = run(p, 4)
     
     @test isa(c, Continuation) == true
-    @test isfin(c) == true
+    @test isdone(c) == true
     @test c.data == (10,)
     
     # short-circuit
     p = pipe(
-        (v) -> fin(v + 1),
-        (v) -> fin(v * 2) )
+        (v) -> done(v + 1),
+        (v) -> done(v * 2) )
     
     @test isa(p, Pipeline)
     
     c = run(p, 4)
     
     @test isa(c, Continuation) == true
-    @test isfin(c) == true
+    @test isdone(c) == true
     @test c.data == (5,)
     
     # concatenation
-    p2 = pipe(v -> cont(v + 1))
+    p2 = pipe(v -> next(v + 1))
     
     p = pipe(
         p2,
-        (v) -> fin(v * 2) )
+        (v) -> done(v * 2) )
         p2,
     
     @test isa(p, Pipeline)
@@ -40,13 +40,13 @@
     c = run(p, 4)
     
     @test isa(c, Continuation) == true
-    @test isfin(c) == true
+    @test isdone(c) == true
     @test c.data == (10,)
     
     # multiple parameters
     p = pipe(
-        (v1, v2) -> cont(v1 + 2, v1 + v2),
-        (v1, v2) -> cont(v1 * 2, v2 + 7) )
+        (v1, v2) -> next(v1 + 2, v1 + v2),
+        (v1, v2) -> next(v1 * 2, v2 + 7) )
         
     c = run(p, 1, 1)
     @test c.data == (6, 9)
@@ -54,8 +54,8 @@ end
 
 @testset "resume" begin
     # normal usage
-    p1 = pipe(v -> fin(v + 1))
-    p2 = pipe(v -> fin(v * 2))
+    p1 = pipe(v -> done(v + 1))
+    p2 = pipe(v -> done(v * 2))
     
     p3 = resume(p1, p2)
     
@@ -67,8 +67,8 @@ end
     @test c.data == (8,)
     
     # when not done
-    p1 = pipe(v -> cont(v + 1))
-    p2 = pipe(v -> fin(v * 2))
+    p1 = pipe(v -> next(v + 1))
+    p2 = pipe(v -> done(v * 2))
     
     p3 = resume(p1, p2)
     
@@ -80,8 +80,8 @@ end
     @test c.data == (4,)
     
     # when not done, but always set to true
-    p1 = pipe(v -> cont(v + 1))
-    p2 = pipe(v -> fin(v * 2))
+    p1 = pipe(v -> next(v + 1))
+    p2 = pipe(v -> done(v * 2))
     
     p3 = resume(p1, p2; always=true)
     
@@ -93,8 +93,8 @@ end
     @test c.data == (8,)
     
     # when done, and always set to true
-    p1 = pipe(v -> fin(v + 1))
-    p2 = pipe(v -> fin(v * 2))
+    p1 = pipe(v -> done(v + 1))
+    p2 = pipe(v -> done(v * 2))
     
     p3 = resume(p1, p2; always=true)
     
@@ -106,8 +106,8 @@ end
     @test c.data == (8,)
     
     # with a function
-    p1 = pipe(v -> fin(v + 1))
-    p2 = v -> fin(v * 2)
+    p1 = pipe(v -> done(v + 1))
+    p2 = v -> done(v * 2)
     
     p3 = resume(p1, p2)
     
@@ -119,10 +119,10 @@ end
     @test c.data == (8,)
     
     # with multiple arguments
-    p1 = pipe(v -> fin(v + 1))
-    p2 = pipe(v -> cont(v * 2))
+    p1 = pipe(v -> done(v + 1))
+    p2 = pipe(v -> next(v * 2))
     
-    p3 = resume(p1, p2, v -> fin(v + 9))
+    p3 = resume(p1, p2, v -> done(v + 9))
     
     @test isa(p3, Pipeline) == true
     
@@ -135,14 +135,14 @@ end
 
 @testset "recover" begin
     # with no exception
-    p = pipe(v -> fin(v + 2))
-    p = recover(p, (err, v) -> fin(v * 12))
+    p = pipe(v -> done(v + 2))
+    p = recover(p, (err, v) -> done(v * 12))
     @test isa(p, Pipeline) == true
 
     c = run(p, 4)
     @test isa(c, Continuation) == true
     
-    @test isfin(c) == true
+    @test isdone(c) == true
     @test c.data == (6,)
     
     # with exception
@@ -150,13 +150,13 @@ end
     p = recover(p, (err, v) -> begin 
         @test isa(err, UndefVarError)
         @test v == 4
-        fin(v * 12)
+        done(v * 12)
     end)
     @test isa(p, Pipeline) == true
 
     c = run(p, 4)
     @test isa(c, Continuation) == true
     
-    @test isfin(c) == true
+    @test isdone(c) == true
     @test c.data == (48,)
 end
