@@ -2,7 +2,7 @@ httptest1 = include("./data/http/test1.jl")
 httptest2 = include("./data/http/test2.jl")
 httptest3 = include("./data/http/test3.jl")
 
-@testset "readrequestline" begin
+@testset "readrequestline!" begin
     io = IOBuffer(httptest1)
     c = Connection(io)
     
@@ -31,8 +31,6 @@ end
     Spirit.readrequestline!(c)
     Spirit.readheaders!(c)
     
-    @test !isequal(nothing, c.rawheaders)
-    @test !isequal(nothing, c.headers)
     rawheaders = c.rawheaders
     headers = c.headers
     @test length(rawheaders) == 2
@@ -48,8 +46,6 @@ end
     Spirit.readrequestline!(c)
     Spirit.readheaders!(c)
     
-    @test !isequal(nothing, c.rawheaders)
-    @test !isequal(nothing, c.headers)
     rawheaders = c.rawheaders
     headers = c.headers
     @test length(rawheaders) == 5
@@ -73,7 +69,6 @@ end
     Spirit.readheaders!(c)
     Spirit.createbodystream!(c)
     
-    @test isequal(nothing, c.bodystream) == false
     @test isa(c.bodystream, SizedStream)
     @test c.bodystream.size == 9
     @test c.bodystartedread == false
@@ -96,7 +91,6 @@ end
     Spirit.readheaders!(c)
     Spirit.createbodystream!(c)
     
-    @test isequal(nothing, c.bodystream) == false
     @test isa(c.bodystream, ChunkedTransferDecodeStream)
     @test c.bodystartedread == false
     @test c.bodyfullyread == false
@@ -104,8 +98,6 @@ end
     @test b == UInt8('\'')
     @test c.bodystartedread == true
     @test c.bodyfullyread == false
-    @test isequal(nothing, c.trailers) == true
-    @test isequal(nothing, c.rawtrailers) == true
     str = read(c.bodystream)
     @test c.bodystartedread == true
     @test c.bodyfullyread == true
@@ -114,8 +106,6 @@ end
         "All mimsy were the borogoves,\n" *
         "      And the mome raths outgrabe."
     @test String(str) == expected
-    @test isequal(nothing, c.trailers) == false
-    @test isequal(nothing, c.rawtrailers) == false
 
     rawtrailers = c.rawtrailers
     @test length(rawtrailers) == 2

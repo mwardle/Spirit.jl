@@ -66,40 +66,45 @@ const COMMENTABLE_HEADER_FIELDS = Set([
 
 mutable struct Connection
     socket::IO
-    method::Nullable{String}
-    uri::Nullable{String}
-    httpversion::Nullable{String}
-    rawheaders::Nullable{Vector{Pair{String,String}}}
-    headers::Nullable{Headers}
-    bodystream::Nullable{IO}
-    rawtrailers::Nullable{Vector{Pair{String,String}}}
-    trailers::Nullable{Headers}
+    method::String
+    uri::String
+    httpversion::String
+    rawheaders::Vector{Pair{String,String}}
+    headers::Headers
+    bodystream::IO
+    rawtrailers::Vector{Pair{String,String}}
+    trailers::Headers
+    
+    requestlineread::Bool
+    headersread::Bool
     bodystartedread::Bool
     bodyfullyread::Bool
-    
     responsesent::Bool
 end
 
 function Connection(socket::IO)
     Connection(socket, 
-        nothing, 
-        nothing, 
-        nothing, 
-        nothing,
-        nothing,
-        nothing,
-        nothing,
-        nothing,
+        "", 
+        "", 
+        "", 
+        Vector{Pair{String,String}}(),
+        Headers(),
+        IOBuffer(""),
+        Vector{Pair{String,String}}(),
+        Headers(),
+        false,
+        false,
         false,
         false,
         false)
 end
 
 function readrequestline!(connection::Connection; maxuri=DEFAULT_MAX_URI, maxmethod=DEFAULT_MAX_METHOD, maxversion=DEFAULT_MAX_VERSION, strict=false)
-    if !isequal(nothing, connection.method)
+    if !isequal(false, connection.requestlineread)
         throw(HTTPError(500; message="Cannot read http connection request line when it has already been read", shouldclose=true))
     end
     
+    connection.requestlineread = true
     method = Vector{UInt8}()
     uri = Vector{UInt8}()
     version = Vector{UInt8}()
@@ -436,11 +441,13 @@ function processheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER, k
 end
 
 function readheaders!(connection::Connection; maxheader=DEFAULT_MAX_HEADER, keepcomments=true, strict=false)
-    if !isequal(nothing, connection.rawheaders)
+    if !isequal(false, connection.headersread)
         throw(HTTPError(500, message="Cannot read http connection headers when they have already been read", shouldclose=true))
     end
     
-    if isequal(nothing, connection.method)
+    connection.headersread = true
+    
+    if isequal(false, connection.requestlineread)
         throw(HTTPError(500, message="Cannot read http connection headers before the requestline has been read", shouldclose=true))
     end
     
@@ -464,8 +471,12 @@ function readtrailers!(connection::Connection; maxtrailer=DEFAULT_MAX_TRAILER, k
 end
 
 function createbodystream!(connection::Connection; maxbody=DEFAULT_MAX_BODY, maxtrailer=DEFAULT_MAX_TRAILER)
-    if isequal(nothing, connection.headers)
-        throw(HTTPError(500; message="Cannot prepare body before headers have been parsed", shouldclose=true))
+    if isequal(false, connection.headersread)
+        throw(HTTPError(500; message="Cannot read body before headers have been parsed", shouldclose=true))
+    end
+    
+    if isequal(true, connection.bodystartedread)
+        throw(HTTPError(500; message="Cannot read body twice", shouldclose=true))
     end
     
     headers = connection.headers
