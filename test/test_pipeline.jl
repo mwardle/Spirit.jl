@@ -33,7 +33,6 @@
     p = pipe(
         p2,
         (v) -> done(v * 2) )
-        p2,
     
     @test isa(p, Pipeline)
     
