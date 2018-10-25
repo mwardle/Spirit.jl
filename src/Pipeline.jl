@@ -31,10 +31,9 @@ end
 Create an http handler pipe.
 
 ```julia
-p = pipe([
+p = pipe(
     (req::Request, res::Response) -> next(req, setheader(res, "X-Powered-By", "Spirit")),
-    (req::Request, res::Response) -> done(req, respond_text(res, "A text response...")) 
-])
+    (req::Request, res::Response) -> done(req, respond_text(res, "A text response...")) )
 
 run(p, req, res)
 ```
@@ -58,13 +57,11 @@ end # Pipeline()
 Continue a pipe that is done.
 
 ```julia
-p = pipe([
-    (req, res) -> done(req, respond_text("this is wrong"))
-])
+p = pipe(
+    (req, res) -> done(req, respond_text("this is wrong")) )
 
-p = resume(p, pipe([
-    (req, res) -> done(req, respond_text("this is right"))
-]))
+p = resume(p, pipe(
+    (req, res) -> done(req, respond_text("this is right")) ))
 ```
 """
 function resume(first::Pipeline, stages::Union{Pipeline,Function}...; always::Bool=false)::Pipeline
