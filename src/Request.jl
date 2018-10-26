@@ -5,29 +5,34 @@ struct Request
     httpversion::AbstractString
     headers::Headers
     resource::AbstractString
-    base::AbstractString
+    resource_base::AbstractString
     params::Dict{AbstractString,Any}
     query::Dict{AbstractString,Any}
     body::Dict{AbstractString,Any}
     cookies::Dict{AbstractString,Any}
     session::Dict{AbstractString,Any}
     files::Dict{AbstractString,Any}
+    data::Dict{AbstractString,Any}
 end # Request
 
 function Request(connection::Connection)
-    method = ''
-    uri = ''
-    httpversion = ''
-    headers = Headers()
-    resource = ''
-    base = ''
+    parseduri = URI(connection.uri)
+    
+    method = connection.method
+    uri = connection.uri
+    httpversion = connection.httpversion
+    headers = connection.headers
+    resource = parseduri.path
+    resource_base = ""
     params = Dict{AbstractString, Any}()
     query = Dict{AbstractString, Any}()
     body = Dict{AbstractString, Any}()
     cookies = Dict{AbstractString, Any}()
     session = Dict{AbstractString, Any}()
     files = Dict{AbstractString, Any}()
-    Request(connection, method, uri, httpversion, headers, resource, base, params, query, body, cookies, session, files)
+    data = Dict{AbstractString, Any}()
+    Request(connection, method, uri, httpversion, headers, resource, 
+        resource_base, params, query, body, cookies, session, files, data)
 end
 
 function Request(req::Request; 
@@ -36,19 +41,21 @@ function Request(req::Request;
     httpversion=req.httpversion,
     headers=req.headers, 
     resource=req.resource,
-    base=req.base,
+    resource_base=req.resource_base,
     params=req.params,
     query=req.query,
     body=req.body,
     cookies=req.cookies,
     session=req.session,
-    files=req.files)
+    files=req.files,
+    data=req.data)
     
-    Request(req.client, method, uri, httpversion, headers, resource, base, params, query, body, cookies, session, files)
+    Request(req.connection, method, uri, httpversion, headers, resource, 
+        resource_base, params, query, body, cookies, session, files, data)
 end
 
-function getheader(req::Request, name::AbstractString)
-    get(req.headers, name)
+function getheader(req::Request, name::AbstractString, default=nothing)
+    get(req.headers, name, default)
 end
 
 function setheader(req::Request, name::AbstractString, value::AbstractString)
