@@ -29,7 +29,7 @@ function createpipelinehandler(opts)
         processrequest!(connection; processopts...)
         # req = Request(connection)
         # res = Response(connection)
-        cont(connection)
+        next(connection)
         
         # TODO: make req + res
     end
