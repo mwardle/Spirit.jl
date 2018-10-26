@@ -2,6 +2,10 @@ using Spirit
 using Test
 using Sockets
 
+httptest1 = include("./data/http/test1.jl")
+httptest2 = include("./data/http/test2.jl")
+httptest3 = include("./data/http/test3.jl")
+
 # write your own tests here
 @testset "Headers" begin
     include("test_headers.jl")
@@ -33,4 +37,8 @@ end
 
 @testset "URI" begin
     include("test_uri.jl")
+end
+
+@testset "Request" begin
+    include("test_request.jl")
 end
