@@ -31,7 +31,7 @@ function Base.haskey(headers::Headers, name::AbstractString)
     haskey(headers.keymap, lcname)
 end
 
-function Base.get(headers::Headers, name::AbstractString, default)
+function Base.get(headers::Headers, name::AbstractString, default=nothing)
     lcname = lowercase(name)
     if !haskey(headers.keymap, lcname)
         default
