@@ -54,15 +54,55 @@ function Request(req::Request;
         resource_base, params, query, body, cookies, session, files, data)
 end
 
+"""
+Retrieve a request's header.
+
+The name is case-insensitive
+
+```julia
+getheader(req, "Content-Type") == getheader(req, "content-type") # true
+```
+"""
 function getheader(req::Request, name::AbstractString, default=nothing)
     get(req.headers, name, default)
 end
 
-function setheader(req::Request, name::AbstractString, value::AbstractString)
+"""
+Set a header for a request.
+
+This function does not mutate the request or its headers, but instead
+returns a new version of the request with the updated header.
+
+If the value is `nothing`, the header will be deleted.
+
+```julia
+req2 = setheader(req, "X-Special-Header", "header value")
+getheader(req, "X-Special-Header")  # nothing
+getheader(req2, "X-Special-Header") # "header value"
+```
+"""
+function setheader(req::Request, name::AbstractString, value::Union{AbstractString,Nothing})
     headers = set(req.headers, name, value)
     Request(req; headers=headers)
 end
 
+"""
+Append a header for a request.
+
+This function does not mutate the request or its headers, but instead
+returns a new version of the request with the updated header.
+
+If the header already exists, the header is appended to the existing header value
+with a comma used as a separator.  Otherwise, the header is set to the value.
+
+```julia
+req = appendheader(req, "X-Special-Header", "header value 1")
+getheader(req, "X-Special-Header") # "header value 1"
+
+req = appendheader(req, "X-Special-Header", "header value 2")
+getheader(req, "X-Special-Header") # "header value 1, header value 2"
+```
+"""
 function appendheader(req::Request, name::AbstractString, value::AbstractString)
     headers = append(req.headers, name, value)
     Request(req; headers=headers)

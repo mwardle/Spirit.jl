@@ -36,3 +36,55 @@
     
     close(io)
 end
+
+@testset "getheader" begin
+    io = IOBuffer(httptest1)
+    c = Connection(io)
+    Spirit.processrequest!(c)
+        
+    req = Spirit.Request(c)
+
+    @test Spirit.getheader(req, "Host") == "www.somewhere.com"
+    @test Spirit.getheader(req, "Content-Length") == "9"
+    @test Spirit.getheader(req, "Does Not Exist") == nothing
+    @test Spirit.getheader(req, "Does Not Exist", "sasquatch") == "sasquatch"
+
+    close(io)
+end
+
+@testset "setheader" begin
+    io = IOBuffer(httptest1)
+    c = Connection(io)
+    Spirit.processrequest!(c)
+        
+    req = Spirit.Request(c)
+
+    req2 = Spirit.setheader(req, "X-Special-Thing", "some value")
+    @test Spirit.getheader(req, "X-Special-Thing") == nothing
+    @test Spirit.getheader(req2, "X-Special-Thing") == "some value"
+    
+    req3 = Spirit.setheader(req2, "X-Special-Thing", nothing)
+    @test Spirit.getheader(req2, "X-Special-Thing") == "some value"
+    @test Spirit.getheader(req3, "X-Special-Thing") == nothing
+    @test Spirit.getheader(req3, "X-Special-Thing", "other value") == "other value"
+
+    close(io)
+end
+
+@testset "appendheader" begin
+    io = IOBuffer(httptest1)
+    c = Connection(io)
+    Spirit.processrequest!(c)
+        
+    req = Spirit.Request(c)
+
+    req2 = Spirit.appendheader(req, "X-Special-Thing", "some value")
+    @test Spirit.getheader(req, "X-Special-Thing") == nothing
+    @test Spirit.getheader(req2, "X-Special-Thing") == "some value"
+    
+    req3 = Spirit.appendheader(req2, "X-Special-Thing", "some other value")
+    @test Spirit.getheader(req2, "X-Special-Thing") == "some value"
+    @test Spirit.getheader(req3, "X-Special-Thing") == "some value, some other value"
+
+    close(io)
+end

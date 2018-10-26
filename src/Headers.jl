@@ -1,4 +1,4 @@
-export Headers, append, get, set, delete
+export Headers, append, get, set, unset, delete
 
 import Base
 
@@ -54,6 +54,24 @@ function set(headers::Headers, name::AbstractString, value::AbstractString)
     
     Base.setindex!(newkeymap, name, lcname)
     Base.setindex!(newdata, value, name)
+    
+    Headers(newdata, newkeymap)
+end
+
+set(headers::Headers, name::AbstractString, value::Nothing) = unset(headers, name)
+
+function unset(headers::Headers, name::AbstractString)
+    lcname = lowercase(name)
+    newdata = merge!(Dict{AbstractString, AbstractString}(), headers.data)
+    newkeymap = merge!(Dict{AbstractString, AbstractString}(), headers.keymap)
+    
+    if haskey(newkeymap, lcname)
+        oldname = get(newkeymap, lcname, "")
+        Base.delete!(newdata, oldname)
+    end
+    
+    Base.delete!(newkeymap, lcname)
+    Base.delete!(newdata, name)
     
     Headers(newdata, newkeymap)
 end
