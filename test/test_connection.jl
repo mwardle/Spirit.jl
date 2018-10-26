@@ -1,7 +1,3 @@
-httptest1 = include("./data/http/test1.jl")
-httptest2 = include("./data/http/test2.jl")
-httptest3 = include("./data/http/test3.jl")
-
 @testset "readrequestline!" begin
     io = IOBuffer(httptest1)
     c = Connection(io)
